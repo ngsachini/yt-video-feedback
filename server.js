@@ -153,7 +153,7 @@ Respond in JSON format with this structure:
     const response = await axios.post('https://api.openai.com/v1/chat/completions', {
         model: 'gpt-4o-mini', // Using a more cost-effective model
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7
+        temperature: 0.2
     }, {
         headers: {
             'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
