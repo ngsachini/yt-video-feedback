@@ -30,12 +30,17 @@
             margin-bottom: 5px;
             font-weight: bold;
         }
-        input[type="text"], input[type="url"] {
+        input[type="url"], textarea {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 16px;
+            font-family: monospace;
+        }
+        textarea {
+            min-height: 300px;
+            resize: vertical;
         }
         button {
             background-color: #ff0000;
@@ -56,6 +61,15 @@
             border-left: 4px solid #ff0000;
             margin-top: 20px;
         }
+        .example-rubric {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
     </style>
 </head>
 <body>
@@ -67,16 +81,24 @@
                 <input type="url" id="videoUrl" name="videoUrl" required placeholder="https://www.youtube.com/watch?v=...">
             </div>
             <div class="form-group">
-                <label for="subject">Subject/Topic:</label>
-                <input type="text" id="subject" name="subject" required placeholder="e.g., Introduction to AI">
+                <label for="rubric">Rubric (JSON format):</label>
+                <textarea id="rubric" name="rubric" required placeholder='Enter rubric in JSON format'>{
+  " - Criteria": "1. Understanding the Problem / Problem Articulation",
+  "Weight (%)": 0.15,
+  "Beginner (1)": "Very limited clarity...",
+  "Intermediate (2)": "Partial clarity...",
+  "Advanced (3)": "Good clarity...",
+  "Expert (4)": "Complete clarity..."
+}</textarea>
             </div>
             <button type="submit">Analyze Video</button>
         </form>
         
         <div class="example">
-            <h3>Example:</h3>
-            <p><strong>Video:</strong> https://www.youtube.com/watch?v=dQw4w9WgXcQ</p>
-            <p><strong>Subject:</strong> Introduction to AI</p>
+            <h3>Instructions:</h3>
+            <p>1. Enter the YouTube video URL</p>
+            <p>2. Modify the rubric JSON as needed for your specific evaluation criteria</p>
+            <p>3. Click "Analyze Video" to generate results</p>
         </div>
     </div>
 </body>
