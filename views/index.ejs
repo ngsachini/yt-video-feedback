@@ -90,23 +90,26 @@
         <div id="errorMessage" class="error-message"></div>
         
         <form id="analysisForm" action="/analyze" method="POST">
+            
+            <div class="form-group">
+                <label>Evaluation Method:
+                    <input type="radio" id="apiMethod" name="evaluationMethod" value="api" checked> API</input>
+                    <input type="radio" id="sdkMethod" name="evaluationMethod" value="sdk">SDK</input>
+                </label>    
+            </div>
+            <div class="form-group">
+                <label><strong>Select LLM Provider:</strong>
+                    <input type="radio" id="geminiProvider" name="llmProvider" value="gemini" checked>Gemini</input>
+                    <input type="radio" id="openaiProvider" name="llmProvider" value="openai">OpenAI</input>
+                    </label>
+                </br>
+            </div>
+            
             <div class="form-group">
                 <label for="videoUrl">YouTube Video URL:</label>
                 <input type="url" id="videoUrl" name="videoUrl" required placeholder="https://www.youtube.com/watch?v=...">
             </div>
-            
-            <div class="form-group">
-                <label>Evaluation Method:</label>
-                <div>
-                    <input type="radio" id="apiMethod" name="evaluationMethod" value="api" checked>
-                    <label for="apiMethod">Evaluate using API</label>
-                </div>
-                <div>
-                    <input type="radio" id="sdkMethod" name="evaluationMethod" value="sdk">
-                    <label for="sdkMethod">Evaluate using SDK</label>
-                </div>
-            </div>
-            
+
             <div class="form-group">
                 <label for="rubric">Rubric (JSON format):</label>
                 <textarea id="rubric" name="rubric" required placeholder='Enter rubric in JSON format'>[
