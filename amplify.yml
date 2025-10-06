@@ -23,7 +23,7 @@ backend:
       commands:
         - echo "Building backend"
   artifacts:
-    baseDirectory: /
+    baseDirectory: dist/
     files:
       - '**/*'
   cache:
