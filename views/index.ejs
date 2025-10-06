@@ -84,7 +84,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>YouTube Video Grade Analyzer</h1>
+        <h1>YouTube Video Feedback</h1>
         
         <!-- Error message container -->
         <div id="errorMessage" class="error-message"></div>
@@ -94,6 +94,19 @@
                 <label for="videoUrl">YouTube Video URL:</label>
                 <input type="url" id="videoUrl" name="videoUrl" required placeholder="https://www.youtube.com/watch?v=...">
             </div>
+            
+            <div class="form-group">
+                <label>Evaluation Method:</label>
+                <div>
+                    <input type="radio" id="apiMethod" name="evaluationMethod" value="api" checked>
+                    <label for="apiMethod">Evaluate using API</label>
+                </div>
+                <div>
+                    <input type="radio" id="sdkMethod" name="evaluationMethod" value="sdk">
+                    <label for="sdkMethod">Evaluate using SDK</label>
+                </div>
+            </div>
+            
             <div class="form-group">
                 <label for="rubric">Rubric (JSON format):</label>
                 <textarea id="rubric" name="rubric" required placeholder='Enter rubric in JSON format'>[

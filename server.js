@@ -23,7 +23,7 @@ app.get('/', (req, res) => {
 
 app.post('/analyze', async (req, res) => {
     try {
-        const { videoUrl, rubric } = req.body;
+        const { videoUrl, rubric, evaluationMethod } = req.body;
         
         // Extract video ID from URL
         const videoId = extractVideoId(videoUrl);
@@ -41,7 +41,7 @@ app.post('/analyze', async (req, res) => {
         }
         
         // Get analysis directly from generative model
-        const analysis = await analyzeVideoWithGenerativeModel(videoUrl, parsedRubric);
+        const analysis = await analyzeVideoWithGenerativeModel(videoUrl, parsedRubric, evaluationMethod);
         
         res.render('result', { 
             analysis: analysis,
@@ -62,43 +62,57 @@ function extractVideoId(url) {
 }
 
 // Main function to analyze video using generative models
-async function analyzeVideoWithGenerativeModel(videoUrl, rubricJson) {
+async function analyzeVideoWithGenerativeModel(videoUrl, rubricJson, evaluationMethod = 'api') {
     try {
-        // Check which generative model API key is available
-        if (process.env.GEMINI_API_KEY) {
-            return await analyzeWithGemini(videoUrl, rubricJson);
-        } else if (process.env.OPENAI_API_KEY) {
-            return await analyzeWithOpenAI(videoUrl, rubricJson);
+        // Check which evaluation method to use
+        if (evaluationMethod === 'sdk') {
+            // Use SDK evaluation methods
+            if (process.env.OPENAI_API_KEY) {
+                return await analyzeWithOpenAISDK(videoUrl, rubricJson);
+            } else if (process.env.GEMINI_API_KEY) {
+                return await analyzeWithGeminiSDK(videoUrl, rubricJson);
+            } else {
+                console.warn('No API keys found for SDK evaluation, falling back to API evaluation');
+                // Fall back to API evaluation if no SDK keys are available
+                return await analyzeVideoWithGenerativeModel(videoUrl, rubricJson, 'api');
+            }
         } else {
-            // Return mock data if no API keys are provided
-            console.warn('No API keys found, returning mock data');
-            
-            // For a single criteria rubric, create a mock evaluation
-            const mockRubricEvaluation = [];
-            
-            // Handle both single criteria object and array of criteria
-            const criteriaArray = Array.isArray(rubricJson) ? rubricJson : [rubricJson];
-            
-            criteriaArray.forEach(criteria => {
-                // Extract criteria name from the complex criteria object
-                const criteriaName = criteria[" - Criteria"] || "Unknown Criteria";
-                // Generate a random score between 1-4
-                const score = Math.floor(Math.random() * 4) + 1;
-                const weight = criteria["Weight (%)"] || 0.25;
+            // Use existing API evaluation methods
+            if (process.env.GEMINI_API_KEY) {
+                return await analyzeWithGemini(videoUrl, rubricJson);
+            } else if (process.env.OPENAI_API_KEY) {
+                return await analyzeWithOpenAI(videoUrl, rubricJson);
+            } else {
+                // Return mock data if no API keys are provided
+                console.warn('No API keys found, returning mock data');
                 
-                mockRubricEvaluation.push({
-                    criteria: criteriaName,
-                    weight: weight,
-                    grade: `${getGradeLabel(score)} (${score})`,
-                    feedback: criteria[`${getGradeLabel(score)} (${score})`] || "No feedback available."
+                // For a single criteria rubric, create a mock evaluation
+                const mockRubricEvaluation = [];
+                
+                // Handle both single criteria object and array of criteria
+                const criteriaArray = Array.isArray(rubricJson) ? rubricJson : [rubricJson];
+                
+                criteriaArray.forEach(criteria => {
+                    // Extract criteria name from the complex criteria object
+                    const criteriaName = criteria[" - Criteria"] || "Unknown Criteria";
+                    // Generate a random score between 1-4
+                    const score = Math.floor(Math.random() * 4) + 1;
+                    const weight = criteria["Weight (%)"] || 0.25;
+                    
+                    mockRubricEvaluation.push({
+                        criteria: criteriaName,
+                        weight: weight,
+                        grade: `${getGradeLabel(score)} (${score})`,
+                        feedback: criteria[`${getGradeLabel(score)} (${score})`] || "No feedback available."
+                    });
                 });
-            });
-            
-            return {
-                rubric: mockRubricEvaluation,
-                overallGrade: "B+ (85%)",
-                feedback: "This is a mock evaluation based on the provided rubric. In a production environment with API keys, this would be generated by analyzing the actual video content."
-            };
+                
+                return {
+                    rubric: mockRubricEvaluation,
+                    overallGrade: "B+ (85%)",
+                    feedback: "This is a mock evaluation based on the provided rubric. In a production environment with API keys, this would be generated by analyzing the actual video content."
+                };
+            }
         }
     } catch (error) {
         console.error('Error calling generative model:', error);
@@ -263,6 +277,194 @@ Respond in JSON format with this structure:
             overallGrade: "B+ (85%)",
             feedback: "This is a mock evaluation because the AI response could not be parsed. In a production environment, this would be generated by analyzing the actual video content."
         };
+    }
+}
+
+// Analyze video using OpenAI SDK
+async function analyzeWithOpenAISDK(videoUrl, rubricJson) {
+    try {
+        const OpenAI = require('openai');
+        
+        if (!process.env.OPENAI_API_KEY) {
+            throw new Error('OPENAI_API_KEY is not set in environment variables');
+        }
+        
+        const openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY
+        });
+        
+        const rubricString = JSON.stringify(rubricJson, null, 2);
+        
+        const prompt = `You are an expert educational content analyzer. Please analyze this YouTube video according to the provided rubric.
+
+Video URL: ${videoUrl}
+
+Rubric (in JSON format):
+${rubricString}
+
+Since you cannot actually access the video, please generate a realistic analysis that would be typical for a YouTube video on this topic.
+
+Please provide an evaluation according to the rubric with the following structure:
+1. For each criteria in the rubric, provide a grade based on the performance levels defined
+2. Include the weight of each criteria
+3. Provide specific feedback explaining why each grade was assigned
+4. Calculate an overall grade
+
+Respond in JSON format with this structure:
+{
+  "rubric": [
+    {
+      "criteria": "string (name of the criteria)",
+      "weight": number (weight of this criteria as defined in the rubric),
+      "grade": "string (performance level with score, e.g. 'Advanced (3)')",
+      "feedback": "string (explanation of why this grade was given based on the rubric descriptions)"
+    }
+  ],
+  "overallGrade": "string (calculated overall grade with percentage)",
+  "feedback": "string (summary feedback explaining the overall evaluation)"
+}`;
+
+        const response = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.2
+        });
+
+        try {
+            const content = response.choices[0].message.content;
+            // Try to parse JSON from the response
+            const jsonStart = content.indexOf('{');
+            const jsonEnd = content.lastIndexOf('}') + 1;
+            const jsonString = content.substring(jsonStart, jsonEnd);
+            return JSON.parse(jsonString);
+        } catch (parseError) {
+            console.error('Error parsing OpenAI SDK response:', parseError);
+            // Return mock data if parsing fails
+            const criteriaArray = Array.isArray(rubricJson) ? rubricJson : [rubricJson];
+            const mockRubricEvaluation = criteriaArray.map(criteria => {
+                const criteriaName = criteria[" - Criteria"] || "Unknown Criteria";
+                const score = Math.floor(Math.random() * 4) + 1;
+                const weight = criteria["Weight (%)"] || 0.25;
+                
+                return {
+                    criteria: criteriaName,
+                    weight: weight,
+                    grade: `${getGradeLabel(score)} (${score})`,
+                    feedback: criteria[`${getGradeLabel(score)} (${score})`] || "No feedback available."
+                };
+            });
+            
+            return {
+                rubric: mockRubricEvaluation,
+                overallGrade: "B+ (85%)",
+                feedback: "This is a mock evaluation because the AI response could not be parsed. In a production environment, this would be generated by analyzing the actual video content."
+            };
+        }
+    } catch (error) {
+        console.error('Error in OpenAI SDK analysis:', error);
+        throw error;
+    }
+}
+
+// Analyze video using Google Gemini SDK
+async function analyzeWithGeminiSDK(videoUrl, rubricJson) {
+    try {
+        const { GoogleGenerativeAI } = require('@google/generative-ai');
+        
+        if (!process.env.GEMINI_API_KEY) {
+            throw new Error('GEMINI_API_KEY is not set in environment variables');
+        }
+        
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        
+        const rubricString = JSON.stringify(rubricJson, null, 2);
+        
+        const prompt = `You are an expert educational content analyzer. Please analyze this YouTube video according to the provided rubric.
+
+Video URL: ${videoUrl}
+
+Rubric (in JSON format):
+${rubricString}
+
+Since you cannot actually access the video, please generate a realistic analysis that would be typical for a YouTube video on this topic.
+
+Please provide an evaluation according to the rubric with the following structure:
+1. For each criteria in the rubric, provide a grade based on the performance levels defined
+2. Include the weight of each criteria
+3. Provide specific feedback explaining why each grade was assigned
+4. Calculate an overall grade
+
+Respond in JSON format with this structure:
+{
+  "rubric": [
+    {
+      "criteria": "string (name of the criteria)",
+      "weight": number (weight of this criteria as defined in the rubric),
+      "grade": "string (performance level with score, e.g. 'Advanced (3)')",
+      "feedback": "string (explanation of why this grade was given based on the rubric descriptions)"
+    }
+  ],
+  "overallGrade": "string (calculated overall grade with percentage)",
+  "feedback": "string (summary feedback explaining the overall evaluation)"
+}`;
+
+        //const result = await model.generateContent(prompt);
+
+        const result = await model.generateContent({
+            contents: [{
+                role: 'user',
+                parts: [
+                    {
+                        text: prompt
+                    }, 
+                    {
+                        fileData: {
+                            mimeType: 'video/mp4',
+                            fileUri: videoUrl,
+                        }
+                    }
+                ]
+            }]
+        });    
+
+
+
+        const response = await result.response;
+        const content = response.text();
+        
+        try {
+            // Try to parse JSON from the response
+            const jsonStart = content.indexOf('{');
+            const jsonEnd = content.lastIndexOf('}') + 1;
+            const jsonString = content.substring(jsonStart, jsonEnd);
+            return JSON.parse(jsonString);
+        } catch (parseError) {
+            console.error('Error parsing Gemini SDK response:', parseError);
+            // Return mock data if parsing fails
+            const criteriaArray = Array.isArray(rubricJson) ? rubricJson : [rubricJson];
+            const mockRubricEvaluation = criteriaArray.map(criteria => {
+                const criteriaName = criteria[" - Criteria"] || "Unknown Criteria";
+                const score = Math.floor(Math.random() * 4) + 1;
+                const weight = criteria["Weight (%)"] || 0.25;
+                
+                return {
+                    criteria: criteriaName,
+                    weight: weight,
+                    grade: `${getGradeLabel(score)} (${score})`,
+                    feedback: criteria[`${getGradeLabel(score)} (${score})`] || "No feedback available."
+                };
+            });
+            
+            return {
+                rubric: mockRubricEvaluation,
+                overallGrade: "B+ (85%)",
+                feedback: "This is a mock evaluation because the AI response could not be parsed. In a production environment, this would be generated by analyzing the actual video content."
+            };
+        }
+    } catch (error) {
+        console.error('Error in Gemini SDK analysis:', error);
+        throw error;
     }
 }
 
